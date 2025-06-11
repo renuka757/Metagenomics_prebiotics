@@ -1,0 +1,19 @@
+library(dada2)
+library(microeco)
+library(file2meco)
+library(RColorBrewer)
+
+ps=readRDS("ps.rds")
+ps_family=tax_glom(ps,taxrank = "Family")
+top10_family <- names(sort(taxa_sums(ps_family), decreasing=TRUE))[1:10]
+ps_rel_family=transform_sample_counts(ps_family,function(x){x/sum(x)})
+
+ps.top20=prune_taxa(top20_family,ps_rel_family)
+
+mycolors <- colorRampPalette(brewer.pal(12, "Paired"))(10)
+
+plot_bar(ps.top20,fill="Family",x="Time",title="Micobial Composition at Family level- pre and post intervention of Prebiotics")+
+  facet_wrap(~Sample_ID,scales="free_x",nrow=1)
+  scale_fill_manual(values = mycolors)
+
+ 
