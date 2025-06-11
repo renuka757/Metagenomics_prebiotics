@@ -1,0 +1,95 @@
+library(DESeq2)
+ps=readRDS("ps.rds")
+ps_genus=tax_glom(ps,taxrank = "Genus")
+names=names(sort(taxa_sums(ps_genus),decreasing = TRUE))[1:20]
+ps_top=prune_taxa(names,ps_genus)
+sample_data(ps_genus)=sample_data(ps_top)
+sample_data(ps_top)$Time=factor(sample_data(ps_top)$Time)
+sample_data(ps_top)$Sample_ID <- factor(sample_data(ps_top)$Sample_ID)
+
+sample_data(ps_top)$Sex=factor(sample_data(ps_top)$Sex)
+levels(sample_data(ps_top)$Time)
+levels(sample_data(ps_top)$Sample_ID)
+levels(sample_data(ps_top)$Time_sex)
+
+sample_data(ps_top)$Time_sex=paste(sample_data(ps_top)$Time,sample_data(ps_top)$Sex,sep="_")
+sample_data(ps_top)$Time_sex=factor(sample_data(ps_top)$Time_sex)
+# levels(sample_data(ps_top)$Time_sex)=factor(sample_data(ps_top)$Time_sex,
+#                                                levels=c("Postintervention_Male",
+#                                               "Preintervention_Male",
+#                                               "Postintervention_Male",
+#                                               "Preintervention_Male"))
+sample_data(ps_top)$Time=relevel(factor(sample_data(ps_top)$Time),ref="Preintervention")
+dds=phyloseq_to_deseq2(ps_top,design = ~Sample_ID+Time)
+dds = dds[rowSums(counts(dds)) > 10, ]
+dds=DESeq(dds)
+res=results(dds,name="Time_Postintervention_vs_Preintervention")
+resultsNames(dds)
+res=as.data.frame(res)
+design(dds)
+
+tax_table=as.data.frame(tax_table(ps_top))
+
+# res$family=tax_table[rownames(res),"Family"]
+
+final_res=res[!is.na(res$log2FoldChange),]
+
+final_res=res[!is.na(res$pvalue),]
+final_res=res[!is.na(res$padj),]
+final_res=as.data.frame(final_res)
+
+# final_res$Genus=tax_table[rownames(final_res),"Genus"]
+# final_res$Genus <- as.character(tax_table(ps_top)[rownames(final_res), "Genus"])
+# all(rownames(final_res) %in% rownames(tax_table(ps_top)))
+tax_table=as.data.frame(tax_table(ps_top))
+
+
+all(rownames(final_res)==rownames(tax_table(ps_top)))
+final_res$Genus=tax_table[rownames(final_res),"Genus"]
+
+
+final_res$significance="Not significant"
+final_res$significance[final_res$pvalue < 0.05 & final_res$log2FoldChange > 1]="upregulated"
+final_res$significance[final_res$pvalue < 0.05 & final_res$log2FoldChange < -1]="downregulated"
+
+upregulated=final_res[final_res$pvalue < 0.05 & final_res$log2FoldChange > 1,]
+downregulated=final_res[final_res$pvalue < 0.05 & final_res$log2FoldChange < -1,]
+
+
+top_up=upregulated[order(upregulated$pvalue),][1:10,]
+top_down=downregulated[order(downregulated$pvalue),][1:10,]
+
+
+
+top_taxa=top_up$Genus
+down_taxa=top_down$Genus
+# final_res$significance="not significant"
+# final_res$significance[final_res$padj<0.5]="Significant"
+# sig=final_res[final_res$padj<0.5,]
+
+total_taxa=c(top_taxa,down_taxa)
+total_taxa=total_taxa[!is.na(total_taxa)]
+total_taxa
+
+final_res$delabel=ifelse(final_res$Genus %in% total_taxa,final_res$Genus,NA)
+final_res_filter=final_res[!is.na(final_res$log2FoldChange),]
+
+library(ggplot2)
+
+lim = round(max(c(max(final_res_filter$log2FoldChange), abs(min(final_res_filter$log2FoldChange))))+1)
+plot=ggplot(final_res_filter,aes(x=log2FoldChange,y = -log10(padj),colour = significance,label=delabel))+
+  geom_vline(xintercept = c(-1,1),col="black",linetype="dashed")+
+  geom_hline(yintercept = -log10(0.05),col="black",linetype="dashed")+
+  geom_point(size=2)+
+  geom_text_repel(color="black",size=4,fontface="bold",point.size = 1,box.padding = 0.25,
+                  nudge_x = 0.15,nudge_y = 0.15,point.padding = 0.1,
+                  min.segment.length = 0.1,max.overlaps = Inf)+
+  xlim(c(-lim,lim))+
+  ggtitle("Differencial Abunndance Expression on Top 10 Taxa at Genus level")
+  theme_minimal()
+  
+png("VOLCANO_top10.png",width=10,height=8,units="in",res=300)
+print(plot)
+dev.off()
+
+is.na(final_res_filter$log2FoldChange)
