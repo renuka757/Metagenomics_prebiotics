@@ -1,0 +1,62 @@
+library(phyloseq)
+library(ggplot2)
+
+
+ps=readRDS("ps.rds")
+plot_richness(ps,x="Sample_ID",measures="shannon",color="Time")+
+  ggtitle("Shannon diversity within individual pre and post interventions")
+
+ps.prop <- transform_sample_counts(ps, function(x) x/sum(x))
+ord.nmds.bray <- ordinate(ps.prop, method="NMDS", distance="bray")
+plot_ordination(ps.prop, ord.nmds.bray, color="Time", title="Bray NMDS")
+
+
+library(phyloseq)
+library(ggplot2)
+
+# Step 1: Agglomerate to Genus level
+ps_genus <- tax_glom(ps, taxrank = "Genus")
+
+# Step 2: Transform to relative abundances (per sample)
+ps_rel_genus <- transform_sample_counts(ps_genus, function(x) x / sum(x))
+
+# Step 3: Ordination using NMDS and Bray-Curtis
+ord_pcoa_genus <- ordinate(ps_rel_genus, method = "PCoA", distance = "bray")
+
+# Step 4: Plot NMDS ordination (colored by a metadata variable, e.g., Time)
+p <- plot_ordination(ps_rel_genus, ord_pcoa_genus, color = "Genus",type = "taxa") +
+  geom_point(size = 2) +
+  ggtitle("Beta diversity PCoA (Bray-Curtis) at Genus Level") +
+  theme_minimal()
+
+
+#beta for genus
+library(phyloseq)
+library(ggplot2)
+
+
+####################################################################################################
+ps_genus=tax_glom(ps,taxrank = "Genus")
+ps_genus_names=names(sort(taxa_sums(ps_genus),decreasing=TRUE))[1:30]
+
+ps_genus_top=prune_taxa(ps_genus_names,ps_genus)
+ps_final=transformSampleCounts(ps_genus_top,function(x){x/sum(x)})
+
+ordinate=ordinate(ps_final,method="PCoA",distance = "bray")
+plot_ordination(ps_final,ordinate,type="taxa",color="Family")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
